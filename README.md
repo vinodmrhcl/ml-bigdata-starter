@@ -1,6 +1,5 @@
 # Machine Learning Starter
 
-#
 
 Starting with Machine Learning could be as complicate as hyped and as easy as Hello World if conquered with simple use case like Recommendation Engine ( RE ). 
 
@@ -8,9 +7,10 @@ The most popular choice for starting Machine Learning in java is Apache Spark, a
 
 Recommendation is consider as Collaborative Filtering problem and Apache Spark has built-in algorithm to implement it.
 
-#
+# What is Collaborative Filtering
 
 As per definition by Apache Spark website
+
 These techniques aim to fill in the missing entries of a user-item association matrix. spark.mllib currently supports model-based collaborative filtering, in which users and products are described by a small set of latent factors that can be used to predict missing entries. spark.mllib uses the alternating least squares (ALS) algorithm to learn these latent factors. The implementation in spark.mllib has the following parameters:
 
 numBlocks is the number of blocks used to parallelize computation (set to -1 to auto-configure).
@@ -25,7 +25,7 @@ implicitPrefs specifies whether to use the explicit feedback ALS variant or one 
 
 alpha is a parameter applicable to the implicit feedback variant of ALS that governs the baseline confidence in preference observations. 
 
-#
+# Getting Started
 
 Apache Spark mllib is available as maven dependency on central repository. You need to setup below module to get it started. 
 
@@ -44,7 +44,7 @@ Apache Spark mllib is available as maven dependency on central repository. You n
 
  ```
 
-#
+# Preparig the data
 
 Now before getting your hand dirty with some code, you need to build valid data sets. 
 In our case we are building a sample Sales Lead prediction model based on past Sales Orders. 
@@ -54,38 +54,42 @@ Here is few sample records from both data sets :
 Sales Orders :
 
 
-UserId UserName ProductId ProductName  Rate Quantity Amount
+UserId  UserName       ProductId     ProductName   Rate  Quantity  Amount
 
-1  User 1  1   Product 1  10  5   50
+1       User 1         1             Product 1     10    5         50
 
-1  User 1  2   Product 2  20  10   200
+1       User 1         2             Product 2     20    10        200
 
-1  User 1  3   Product 3  10  15   150
+1       User 1         3             Product 3     10    15        150
 
-2  User 2  1   Product 1  10  5   50
+2       User 2         1             Product 1     10    5         50
 
-2  User 2  2   Product 2  20  20   400
+2       User 2         2             Product 2     20    20        400
 
-2  User 2  4   Product 5  10  15   150
+2       User 2         4             Product 5     10    15        150
+
 
 Sales Leads :
 
 
-UserId UserName ProductId ProductName
+UserId  UserName      ProductId     ProductName
 
-1  User 1  4   Product 4
+1       User 1        4             Product 4
 
-1  User 1  5   Product 5
+1       User 1        5             Product 5
 
-2  User 2  3   Product 3
+2       User 2        3             Product 3
 
-2  User 2  6   Product 6
+2       User 2        6             Product 6
+
 
 We need to predict/recommend most relevant Product for both the user based onto their past order history. Here we can see Both User 1 and User 2 ordered Product 1 and Product 2, also they have ordered one item separately. 
 
 Now we predicting their rating for alternate product and one new product.
 
-#
+# Implementaion
+
+## #1
 
 First step is to load the training model and convert it to Rating format using JavaRDD API.
 
@@ -103,7 +107,7 @@ JavaRDD<Rating> ratings = salesOrdersFile.map(new Function<String, Rating>() { 
   
 ```
 
-#
+## #2
 
 Next step is to train the Matrix Factorization model using ALS algorithm.
 
@@ -111,7 +115,7 @@ Next step is to train the Matrix Factorization model using ALS algorithm.
 MatrixFactorizationModel model = ALS.train(JavaRDD.toRDD(ratings), rank, numIterations); 
 ```
 
-#
+## #3
 
 Now we load the Sales Lead file and convert it to Tupple format.
 
@@ -129,7 +133,7 @@ JavaRDD<Tuple2<Object, Object>> userProducts = salesLeadsFile.map(new Function<S
 
 ```
 
-#
+## #4
 
 Finally we can predict the future rating using simple API.
 
@@ -139,7 +143,7 @@ JavaRDD<Rating> recomondations = model.predict(userProducts.rdd()).toJavaRDD().d
 
 ```
 
-#
+## #5
 
 Optionally you can sort the output using basic pipeline operation
 
@@ -154,7 +158,7 @@ recomondations = recomondations.sortBy(new Function<Rating, Double>() {  
 
 ```
 
-#
+## #6
 
 Now you display your result using basic JavaRDD API.
 
@@ -169,3 +173,12 @@ recomondations.foreach(new VoidFunction<Rating>() {  
   });
   
 ```
+
+
+# Output
+User : 2 Product : 3 Rating : 54.54927015541634
+User : 1 Product : 4 Rating : 49.93948224984236
+
+# Conclusion
+The above output recommends the User 2 would like to buy Product 3 and  User 2 would go for User 4. 
+This also recommends that their is no recommendation for new product as they do not match any similarity criteria in past.
