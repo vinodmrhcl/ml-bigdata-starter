@@ -144,7 +144,7 @@ JavaRDD<Rating> recomondations = model.predict(userProducts.rdd()).toJavaRDD().d
 
 ```
 
-## #5
+## #6
 
 Optionally you can sort the output using basic pipeline operation
 
@@ -159,7 +159,7 @@ recomondations = recomondations.sortBy(new Function<Rating, Double>() {  
 
 ```
 
-## #6
+## #7
 
 Now you display your result using basic JavaRDD API.
 
