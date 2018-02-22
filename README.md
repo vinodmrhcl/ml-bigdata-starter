@@ -1,55 +1,32 @@
-# Machine Learning Starter
+# Machine Learning Big Data Starter
 
 
-Starting with Machine Learning could be as complicate as hyped and as easy as Hello World if conquered with simple use case like Recommendation Engine ( RE ). 
+This artifact is further progression on my previous work [ml-starter](https://github.com/ERS-HCL/ml-starter) which is standalone version of spark-mllib's ALS demonstration based using local CSV files.
 
-The most popular choice for starting Machine Learning in java is Apache Spark, as it come with a special ML library/module with lots of simple to advance algorithm.
+### Note : Please read the above in detail before proceeding further. 
 
-Recommendation is consider as Collaborative Filtering problem and Apache Spark has built-in algorithm to implement it.
+To go one step first further I have replaced the file system layer with MongoDB.
 
-# What is Collaborative Filtering
+MongoDB provide a spark-mongo connector that wrap standard Java/Scala connector with spark interpolatable data format/API's.  
 
-As per definition by Apache Spark website
-
-These techniques aim to fill in the missing entries of a user-item association matrix. spark.mllib currently supports model-based collaborative filtering, in which users and products are described by a small set of latent factors that can be used to predict missing entries. spark.mllib uses the alternating least squares (ALS) algorithm to learn these latent factors. The implementation in spark.mllib has the following parameters:
-
-numBlocks is the number of blocks used to parallelize computation (set to -1 to auto-configure).
-
-rank is the number of features to use (also referred to as the number of latent factors). 
-
-iterations is the number of iterations of ALS to run. ALS typically converges to a reasonable solution in 20 iterations or less. 
-
-lambda specifies the regularization parameter in ALS. 
-
-implicitPrefs specifies whether to use the explicit feedback ALS variant or one adapted for implicit feedback data. 
-
-alpha is a parameter applicable to the implicit feedback variant of ALS that governs the baseline confidence in preference observations. 
 
 # Getting Started
 
-Apache Spark mllib is available as maven dependency on central repository. You need to setup below module to get it started. 
+Apart from the spark core API's you would need following dependency to connect to MongoDB server. 
 
 ```
-<dependency> 
-  <groupId>org.apache.spark</groupId>  
-  <artifactId>spark-core_2.11</artifactId>  
-  <version>${spark.version}</version> 
-</dependency>
 
-<dependency>  
-  <groupId>org.apache.spark</groupId>  
-  <artifactId>spark-mllib_2.11</artifactId>  
-  <version>${spark.version}</version> 
-</dependency>  
+<dependency>
+	<groupId>org.mongodb.spark</groupId>
+	<artifactId>mongo-spark-connector_2.11</artifactId>
+	<version>2.2.1</version>
+</dependency>
 
  ```
 
-# Preparig the data
+# Preparing the data
 
-Now before getting your hand dirty with some code, you need to build valid data sets. 
-In our case we are building a sample Sales Lead prediction model based on past Sales Orders. 
-Here is few sample records from both data sets :
-
+In current scenario i.e MongoDB instead of creating files we need same data in BSON format in collections. 
 
 Sales Orders :
 
@@ -91,23 +68,49 @@ Now we predicting their rating for alternate product and one new product.
 
 ## #1
 
-First step is to load the training model and convert it to Rating format using JavaRDD API.
+Our first step would be making db connection using MongoDB specific properties.
 
 ```
-JavaRDD<String> salesOrdersFile = sc.textFile("target/classes/data/sales_orders.csv");
 
-int ratingIndex = amountIndex; // Map file to Ratings(user, item, rating) tuples 
+SparkConf conf = new SparkConf().//
+	setAppName("rnd").//
+	setMaster("local").//
+	set("spark.mongodb.input.uri", "mongodb://127.0.0.1:27017/sparkdb.myCollection").//
+	set("spark.mongodb.output.uri", "mongodb://127.0.0.1:27017/sparkdb.myCollection");
 
-JavaRDD<Rating> ratings = salesOrdersFile.map(new Function<String, Rating>() {  
-  public Rating call(String order) {   
-    String data[] = order.split(",");   
-    return new Rating(Integer.parseInt(data[userIdIndex]), Integer.parseInt(data[productIdIndex]), Double.parseDouble(data[ratingIndex]));  
-    } 
-  });
-  
 ```
 
 ## #2
+
+Now you can read training model via JavaMongoRDD API and convert it to Rating format using JavaRDD API.
+
+```
+
+private static JavaMongoRDD<Document> getJavaMongoRDD(JavaSparkContext jsc, String collName) {
+
+	Map<String, String> readOverrides = new HashMap<String, String>();
+	readOverrides.put("collection", collName);
+	readOverrides.put("readPreference.name", "secondaryPreferred");
+	ReadConfig readConfig = ReadConfig.create(jsc).withOptions(readOverrides);
+
+	JavaMongoRDD<Document> mongoRDD = MongoSpark.load(jsc, readConfig);
+	return mongoRDD;
+}
+
+JavaMongoRDD<Document> salesOrdersRDD = getJavaMongoRDD(jsc, "SalesOrders");
+
+
+// Map file to Ratings(user,item,rating) tuples
+JavaRDD<Rating> ratings = salesOrdersRDD.map(new Function<Document, Rating>() {
+	public Rating call(Document d) {
+		return new Rating(d.getInteger("userCode"), d.getInteger("productCode"), ((Number) d.get("amount")).doubleValue());
+	}
+});
+
+  
+```
+
+## #3
 
 Next step is to train the Matrix Factorization model using ALS algorithm.
 
@@ -115,25 +118,23 @@ Next step is to train the Matrix Factorization model using ALS algorithm.
 MatrixFactorizationModel model = ALS.train(JavaRDD.toRDD(ratings), rank, numIterations); 
 ```
 
-## #3
+## #4
 
-Now we load the Sales Lead file and convert it to Tupple format.
+Now you can load the Sales Lead file and convert it to Tupple format.
 
 ```
-// file format - user, product 
-JavaRDD<String> salesLeadsFile = sc.textFile("target/classes/data/sales_leads.csv");
+JavaMongoRDD<Document> salesLeadsRDD = getJavaMongoRDD(jsc, "SalesLeads");
 
-// Create user-product tuples from leads
-JavaRDD<Tuple2<Object, Object>> userProducts = salesLeadsFile.map(new Function<String, Tuple2<Object, Object>>() {  
-  public Tuple2<Object, Object> call(String lead) {   
-    String data[] = lead.split(",");   
-    return new Tuple2<Object, Object>(Integer.parseInt(data[userIdIndex]), Integer.parseInt(data[productIdIndex]));  
-  } 
+// Create user-item tuples from ratings
+JavaRDD<Tuple2<Object, Object>> userProducts = salesLeadsRDD.map(new Function<Document, Tuple2<Object, Object>>() {
+	public Tuple2<Object, Object> call(Document d) {
+		return new Tuple2<Object, Object>(d.getInteger("userCode"), d.getInteger("productCode"));
+	}
 });
 
 ```
 
-## #4
+## #5
 
 Finally we can predict the future rating using simple API.
 
@@ -177,6 +178,7 @@ recomondations.foreach(new VoidFunction<Rating>() {  
 
 # Output
 User : 2 Product : 3 Rating : 54.54927015541634
+
 User : 1 Product : 4 Rating : 49.93948224984236
 
 # Conclusion
