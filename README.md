@@ -43,7 +43,7 @@ UserId  UserName       ProductId     ProductName   Rate  Quantity  Amount
 
 2       User 2         2             Product 2     20    20        400
 
-2       User 2         4             Product 5     10    15        150
+2       User 2         4             Product 4     10    15        150
 
 
 Sales Leads :
@@ -182,5 +182,5 @@ User : 2 Product : 3 Rating : 54.54927015541634
 User : 1 Product : 4 Rating : 49.93948224984236
 
 # Conclusion
-The above output recommends the User 2 would like to buy Product 3 and  User 2 would go for User 4. 
+The above output recommends the User 2 would like to buy Product 3 and  User 1 would go for User 4. 
 This also recommends that their is no recommendation for new product as they do not match any similarity criteria in past.
